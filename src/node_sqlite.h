@@ -35,11 +35,44 @@ class DatabaseOpenConfiguration {
 
   inline void set_enable_dqs(bool flag) { enable_dqs_ = flag; }
 
+  inline void set_timeout(int timeout) { timeout_ = timeout; }
+
+  inline int get_timeout() { return timeout_; }
+
+  inline void set_use_big_ints(bool flag) { use_big_ints_ = flag; }
+
+  inline bool get_use_big_ints() const { return use_big_ints_; }
+
+  inline void set_return_arrays(bool flag) { return_arrays_ = flag; }
+
+  inline bool get_return_arrays() const { return return_arrays_; }
+
+  inline void set_allow_bare_named_params(bool flag) {
+    allow_bare_named_params_ = flag;
+  }
+
+  inline bool get_allow_bare_named_params() const {
+    return allow_bare_named_params_;
+  }
+
+  inline void set_allow_unknown_named_params(bool flag) {
+    allow_unknown_named_params_ = flag;
+  }
+
+  inline bool get_allow_unknown_named_params() const {
+    return allow_unknown_named_params_;
+  }
+
  private:
   std::string location_;
   bool read_only_ = false;
   bool enable_foreign_keys_ = true;
   bool enable_dqs_ = false;
+  int timeout_ = 0;
+  bool use_big_ints_ = false;
+  bool return_arrays_ = false;
+  bool allow_bare_named_params_ = true;
+  bool allow_unknown_named_params_ = false;
 };
 
 class StatementSync;
@@ -56,10 +89,16 @@ class DatabaseSync : public BaseObject {
   static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void Open(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void IsOpenGetter(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void IsTransactionGetter(
+      const v8::FunctionCallbackInfo<v8::Value>& args);
   static void Close(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void Dispose(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void Prepare(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void Exec(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void Location(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void CustomFunction(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void AggregateFunction(
+      const v8::FunctionCallbackInfo<v8::Value>& args);
   static void CreateSession(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void ApplyChangeset(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void EnableLoadExtension(
@@ -71,6 +110,14 @@ class DatabaseSync : public BaseObject {
   void FinalizeBackups();
   void UntrackStatement(StatementSync* statement);
   bool IsOpen();
+  bool use_big_ints() const { return open_config_.get_use_big_ints(); }
+  bool return_arrays() const { return open_config_.get_return_arrays(); }
+  bool allow_bare_named_params() const {
+    return open_config_.get_allow_bare_named_params();
+  }
+  bool allow_unknown_named_params() const {
+    return open_config_.get_allow_unknown_named_params();
+  }
   sqlite3* Connection();
 
   // In some situations, such as when using custom functions, it is possible
@@ -123,7 +170,10 @@ class StatementSync : public BaseObject {
       const v8::FunctionCallbackInfo<v8::Value>& args);
   static void SetAllowBareNamedParameters(
       const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void SetAllowUnknownNamedParameters(
+      const v8::FunctionCallbackInfo<v8::Value>& args);
   static void SetReadBigInts(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void SetReturnArrays(const v8::FunctionCallbackInfo<v8::Value>& args);
   void Finalize();
   bool IsFinalized();
 
@@ -134,18 +184,39 @@ class StatementSync : public BaseObject {
   ~StatementSync() override;
   BaseObjectPtr<DatabaseSync> db_;
   sqlite3_stmt* statement_;
+  bool return_arrays_ = false;
   bool use_big_ints_;
   bool allow_bare_named_params_;
+  bool allow_unknown_named_params_;
   std::optional<std::map<std::string, std::string>> bare_named_params_;
   bool BindParams(const v8::FunctionCallbackInfo<v8::Value>& args);
   bool BindValue(const v8::Local<v8::Value>& value, const int index);
   v8::MaybeLocal<v8::Value> ColumnToValue(const int column);
   v8::MaybeLocal<v8::Name> ColumnNameToName(const int column);
 
-  static void IterateNextCallback(
-      const v8::FunctionCallbackInfo<v8::Value>& args);
-  static void IterateReturnCallback(
-      const v8::FunctionCallbackInfo<v8::Value>& args);
+  friend class StatementSyncIterator;
+};
+
+class StatementSyncIterator : public BaseObject {
+ public:
+  StatementSyncIterator(Environment* env,
+                        v8::Local<v8::Object> object,
+                        BaseObjectPtr<StatementSync> stmt);
+  void MemoryInfo(MemoryTracker* tracker) const override;
+  static v8::Local<v8::FunctionTemplate> GetConstructorTemplate(
+      Environment* env);
+  static BaseObjectPtr<StatementSyncIterator> Create(
+      Environment* env, BaseObjectPtr<StatementSync> stmt);
+  static void Next(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void Return(const v8::FunctionCallbackInfo<v8::Value>& args);
+
+  SET_MEMORY_INFO_NAME(StatementSyncIterator)
+  SET_SELF_SIZE(StatementSyncIterator)
+
+ private:
+  ~StatementSyncIterator() override;
+  BaseObjectPtr<StatementSync> stmt_;
+  bool done_;
 };
 
 using Sqlite3ChangesetGenFunc = int (*)(sqlite3_session*, int*, void**);
@@ -160,6 +231,7 @@ class Session : public BaseObject {
   template <Sqlite3ChangesetGenFunc sqliteChangesetFunc>
   static void Changeset(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void Close(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void Dispose(const v8::FunctionCallbackInfo<v8::Value>& args);
   static v8::Local<v8::FunctionTemplate> GetConstructorTemplate(
       Environment* env);
   static BaseObjectPtr<Session> Create(Environment* env,

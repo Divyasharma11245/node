@@ -174,7 +174,7 @@ MaybeLocal<Object> TranscodeLatin1ToUcs2(Environment* env,
                                          const char* source,
                                          const size_t source_length,
                                          UErrorCode* status) {
-  MaybeStackBuffer<UChar> destbuf(source_length);
+  MaybeStackBuffer<char16_t> destbuf(source_length);
   auto actual_length =
       simdutf::convert_latin1_to_utf16le(source, source_length, destbuf.out());
   if (actual_length == 0) {
@@ -218,7 +218,7 @@ MaybeLocal<Object> TranscodeUcs2FromUtf8(Environment* env,
                                          UErrorCode* status) {
   size_t expected_utf16_length =
       simdutf::utf16_length_from_utf8(source, source_length);
-  MaybeStackBuffer<UChar> destbuf(expected_utf16_length);
+  MaybeStackBuffer<char16_t> destbuf(expected_utf16_length);
   auto actual_length =
       simdutf::convert_utf8_to_utf16le(source, source_length, destbuf.out());
 
@@ -500,7 +500,6 @@ void ConverterObject::Decode(const FunctionCallbackInfo<Value>& args) {
       }
     }
 
-    Local<Value> error;
     UChar* output = result.out();
     size_t beginning = 0;
     size_t length = result.length() * sizeof(UChar);
@@ -517,11 +516,9 @@ void ConverterObject::Decode(const FunctionCallbackInfo<Value>& args) {
       CHECK(nbytes::SwapBytes16(value, length));
     }
 
-    MaybeLocal<Value> encoded =
-        StringBytes::Encode(env->isolate(), value, length, UCS2, &error);
-
     Local<Value> ret;
-    if (encoded.ToLocal(&ret)) {
+    if (StringBytes::Encode(env->isolate(), value, length, UCS2)
+            .ToLocal(&ret)) {
       args.GetReturnValue().Set(ret);
       return;
     }

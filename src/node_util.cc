@@ -61,8 +61,7 @@ static void GetOwnNonIndexProperties(
 
   Local<Array> properties;
 
-  PropertyFilter filter =
-    static_cast<PropertyFilter>(args[1].As<Uint32>()->Value());
+  PropertyFilter filter = FromV8Value<PropertyFilter>(args[1]);
 
   if (!object->GetPropertyNames(
         context, KeyCollectionMode::kOwnOnly,
@@ -257,7 +256,7 @@ static void GetCallSites(const FunctionCallbackInfo<Value>& args) {
   CHECK_EQ(args.Length(), 1);
   CHECK(args[0]->IsNumber());
   const uint32_t frames = args[0].As<Uint32>()->Value();
-  DCHECK(frames >= 1 && frames <= 200);
+  CHECK(frames >= 1 && frames <= 200);
 
   // +1 for disregarding node:util
   Local<StackTrace> stack = StackTrace::CurrentStackTrace(isolate, frames + 1);
@@ -443,8 +442,7 @@ void RegisterExternalReferences(ExternalReferenceRegistry* registry) {
   registry->Register(Sleep);
   registry->Register(ArrayBufferViewHasBuffer);
   registry->Register(GuessHandleType);
-  registry->Register(FastGuessHandleType);
-  registry->Register(fast_guess_handle_type_.GetTypeInfo());
+  registry->Register(fast_guess_handle_type_);
   registry->Register(ParseEnv);
   registry->Register(IsInsideNodeModules);
   registry->Register(DefineLazyProperties);

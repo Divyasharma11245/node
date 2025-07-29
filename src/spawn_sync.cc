@@ -378,8 +378,24 @@ void SyncProcessRunner::RegisterExternalReferences(
 
 void SyncProcessRunner::Spawn(const FunctionCallbackInfo<Value>& args) {
   Environment* env = Environment::GetCurrent(args);
+  Local<Context> context = env->context();
+
+  std::string resource = "";
+  if (env->permission()->enabled() && args[0]->IsObject()) {
+    Local<Object> js_options = args[0].As<Object>();
+    Local<Value> js_file;
+    if (!js_options->Get(context, env->file_string()).ToLocal(&js_file)) {
+      return;
+    }
+
+    if (js_file->IsString()) {
+      node::Utf8Value executable(env->isolate(), js_file.As<String>());
+      resource = executable.ToString();
+    }
+  }
+
   THROW_IF_INSUFFICIENT_PERMISSIONS(
-      env, permission::PermissionScope::kChildProcess, "");
+      env, permission::PermissionScope::kChildProcess, resource);
   env->PrintSyncTrace();
   SyncProcessRunner p(env);
   Local<Value> result;
@@ -1055,7 +1071,10 @@ Maybe<int> SyncProcessRunner::ParseStdioOption(int child_fd,
     return Just(AddStdioInheritFD(child_fd, inherit_fd));
   }
 
-  UNREACHABLE("invalid child stdio type");
+  Utf8Value stdio_type(env()->isolate(), js_type);
+  fprintf(stderr, "invalid child stdio type: %s\n", stdio_type.out());
+
+  UNREACHABLE();
 }
 
 int SyncProcessRunner::AddStdioIgnore(uint32_t child_fd) {

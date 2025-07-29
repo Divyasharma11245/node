@@ -53,7 +53,6 @@ using v8::Function;
 using v8::FunctionCallbackInfo;
 using v8::FunctionTemplate;
 using v8::HandleScope;
-using v8::Int32;
 using v8::Integer;
 using v8::Isolate;
 using v8::Local;
@@ -608,7 +607,8 @@ class CompressionStream : public AsyncWrap, public ThreadPoolWork {
   }
 
   static void* AllocForBrotli(void* data, size_t size) {
-    size += sizeof(size_t);
+    constexpr size_t offset = std::max(sizeof(size_t), alignof(max_align_t));
+    size += offset;
     CompressionStream* ctx = static_cast<CompressionStream*>(data);
     char* memory = UncheckedMalloc(size);
     if (memory == nullptr) [[unlikely]] {
@@ -617,7 +617,7 @@ class CompressionStream : public AsyncWrap, public ThreadPoolWork {
     *reinterpret_cast<size_t*>(memory) = size;
     ctx->unreported_allocations_.fetch_add(size,
                                            std::memory_order_relaxed);
-    return memory + sizeof(size_t);
+    return memory + offset;
   }
 
   static void FreeForZlib(void* data, void* pointer) {
@@ -625,7 +625,8 @@ class CompressionStream : public AsyncWrap, public ThreadPoolWork {
       return;
     }
     CompressionStream* ctx = static_cast<CompressionStream*>(data);
-    char* real_pointer = static_cast<char*>(pointer) - sizeof(size_t);
+    constexpr size_t offset = std::max(sizeof(size_t), alignof(max_align_t));
+    char* real_pointer = static_cast<char*>(pointer) - offset;
     size_t real_size = *reinterpret_cast<size_t*>(real_pointer);
     ctx->unreported_allocations_.fetch_sub(real_size,
                                            std::memory_order_relaxed);
@@ -640,7 +641,8 @@ class CompressionStream : public AsyncWrap, public ThreadPoolWork {
     if (report == 0) return;
     CHECK_IMPLIES(report < 0, zlib_memory_ >= static_cast<size_t>(-report));
     zlib_memory_ += report;
-    AsyncWrap::env()->isolate()->AdjustAmountOfExternalAllocatedMemory(report);
+    AsyncWrap::env()->external_memory_accounter()->Increase(
+        AsyncWrap::env()->isolate(), report);
   }
 
   struct AllocScope {
@@ -685,8 +687,7 @@ class ZlibStream final : public CompressionStream<ZlibContext> {
   static void New(const FunctionCallbackInfo<Value>& args) {
     Environment* env = Environment::GetCurrent(args);
     CHECK(args[0]->IsInt32());
-    node_zlib_mode mode =
-        static_cast<node_zlib_mode>(args[0].As<Int32>()->Value());
+    node_zlib_mode mode = FromV8Value<node_zlib_mode>(args[0]);
     new ZlibStream(env, args.This(), mode);
   }
 
@@ -791,8 +792,7 @@ class BrotliCompressionStream final :
   static void New(const FunctionCallbackInfo<Value>& args) {
     Environment* env = Environment::GetCurrent(args);
     CHECK(args[0]->IsInt32());
-    node_zlib_mode mode =
-        static_cast<node_zlib_mode>(args[0].As<Int32>()->Value());
+    node_zlib_mode mode = FromV8Value<node_zlib_mode>(args[0]);
     new BrotliCompressionStream(env, args.This(), mode);
   }
 

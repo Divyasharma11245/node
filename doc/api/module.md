@@ -8,7 +8,7 @@ added: v0.3.7
 
 ## The `Module` object
 
-* {Object}
+* Type: {Object}
 
 Provides general utility methods when interacting with instances of
 `Module`, the [`module`][] variable often seen in [CommonJS][] modules. Accessed
@@ -27,7 +27,7 @@ changes:
     description: The list now also contains prefix-only modules.
 -->
 
-* {string\[]}
+* Type: {string\[]}
 
 A list of the names of all modules provided by Node.js. Can be used to verify
 if a module is maintained by a third party or not.
@@ -219,7 +219,9 @@ This feature requires `--allow-worker` if used with the [Permission Model][].
 ### `module.registerHooks(options)`
 
 <!-- YAML
-added: v23.5.0
+added:
+  - v23.5.0
+  - v22.15.0
 -->
 
 > Stability: 1.1 - Active development
@@ -239,7 +241,7 @@ added:
   - v22.13.0
 -->
 
-> Stability: 1.1 - Active development
+> Stability: 1.2 - Release candidate
 
 * `code` {string} The code to strip type annotations from.
 * `options` {Object}
@@ -547,7 +549,9 @@ added: v22.8.0
 <!-- YAML
 added: v8.8.0
 changes:
-  - version: v23.5.0
+  - version:
+    - v23.5.0
+    - v22.15.0
     pr-url: https://github.com/nodejs/node/pull/55698
     description: Add support for synchronous and in-thread hooks.
   - version:
@@ -880,7 +884,9 @@ child workers by default.
 #### Synchronous hooks accepted by `module.registerHooks()`
 
 <!-- YAML
-added: v23.5.0
+added:
+  - v23.5.0
+  - v22.15.0
 -->
 
 > Stability: 1.1 - Active development
@@ -1009,7 +1015,9 @@ register('./path-to-my-hooks.js', {
 
 <!-- YAML
 changes:
-  - version: v23.5.0
+  - version:
+    - v23.5.0
+    - v22.15.0
     pr-url: https://github.com/nodejs/node/pull/55698
     description: Add support for synchronous and in-thread hooks.
   - version:
@@ -1033,9 +1041,6 @@ changes:
     pr-url: https://github.com/nodejs/node/pull/40250
     description: Add support for import assertions.
 -->
-
-> Stability: 1.2 - Release candidate (asynchronous version)
-> Stability: 1.1 - Active development (synchronous version)
 
 * `specifier` {string}
 * `context` {Object}
@@ -1135,9 +1140,14 @@ function resolve(specifier, context, nextResolve) {
 
 <!-- YAML
 changes:
-  - version: v23.5.0
+  - version:
+    - v23.5.0
+    - v22.15.0
     pr-url: https://github.com/nodejs/node/pull/55698
     description: Add support for synchronous and in-thread version.
+  - version: v22.6.0
+    pr-url: https://github.com/nodejs/node/pull/56350
+    description: Add support for `source` with format `commonjs-typescript` and `module-typescript`.
   - version: v20.6.0
     pr-url: https://github.com/nodejs/node/pull/47999
     description: Add support for `source` with format `commonjs`.
@@ -1149,9 +1159,6 @@ changes:
       call `nextLoad()` or include a `shortCircuit` property set to `true` in
       its return.
 -->
-
-> Stability: 1.2 - Release candidate (asynchronous version)
-> Stability: 1.1 - Active development (synchronous version)
 
 * `url` {string} The URL returned by the `resolve` chain
 * `context` {Object}
@@ -1183,14 +1190,16 @@ validating the import attributes.
 
 The final value of `format` must be one of the following:
 
-| `format`     | Description                    | Acceptable types for `source` returned by `load`   |
-| ------------ | ------------------------------ | -------------------------------------------------- |
-| `'addon'`    | Load a Node.js addon           | {null}                                             |
-| `'builtin'`  | Load a Node.js builtin module  | {null}                                             |
-| `'commonjs'` | Load a Node.js CommonJS module | {string\|ArrayBuffer\|TypedArray\|null\|undefined} |
-| `'json'`     | Load a JSON file               | {string\|ArrayBuffer\|TypedArray}                  |
-| `'module'`   | Load an ES module              | {string\|ArrayBuffer\|TypedArray}                  |
-| `'wasm'`     | Load a WebAssembly module      | {ArrayBuffer\|TypedArray}                          |
+| `format`                | Description                                           | Acceptable types for `source` returned by `load`   |
+| ----------------------- | ----------------------------------------------------- | -------------------------------------------------- |
+| `'addon'`               | Load a Node.js addon                                  | {null}                                             |
+| `'builtin'`             | Load a Node.js builtin module                         | {null}                                             |
+| `'commonjs-typescript'` | Load a Node.js CommonJS module with TypeScript syntax | {string\|ArrayBuffer\|TypedArray\|null\|undefined} |
+| `'commonjs'`            | Load a Node.js CommonJS module                        | {string\|ArrayBuffer\|TypedArray\|null\|undefined} |
+| `'json'`                | Load a JSON file                                      | {string\|ArrayBuffer\|TypedArray}                  |
+| `'module-typescript'`   | Load an ES module with TypeScript syntax              | {string\|ArrayBuffer\|TypedArray}                  |
+| `'module'`              | Load an ES module                                     | {string\|ArrayBuffer\|TypedArray}                  |
+| `'wasm'`                | Load a WebAssembly module                             | {ArrayBuffer\|TypedArray}                          |
 
 The value of `source` is ignored for type `'builtin'` because currently it is
 not possible to replace the value of a Node.js builtin (core) module.
@@ -1562,7 +1571,7 @@ Running `node --import 'data:text/javascript,import { register } from "node:modu
 or `node --import ./import-map-sync-hooks.js main.js`
 should print `some module!`.
 
-## Source map v3 support
+## Source Map Support
 
 <!-- YAML
 added:
@@ -1572,13 +1581,17 @@ added:
 
 > Stability: 1 - Experimental
 
-Helpers for interacting with the source map cache. This cache is
-populated when source map parsing is enabled and
+Node.js supports TC39 ECMA-426 [Source Map][] format (it was called Source map
+revision 3 format).
+
+The APIs in this section are helpers for interacting with the source map
+cache. This cache is populated when source map parsing is enabled and
 [source map include directives][] are found in a modules' footer.
 
 To enable source map parsing, Node.js must be run with the flag
 [`--enable-source-maps`][], or with code coverage enabled by setting
-[`NODE_V8_COVERAGE=dir`][].
+[`NODE_V8_COVERAGE=dir`][], or be enabled programmatically via
+[`module.setSourceMapsSupport()`][].
 
 ```mjs
 // module.mjs
@@ -1676,15 +1689,15 @@ changes:
 
 Creates a new `sourceMap` instance.
 
-`payload` is an object with keys matching the [Source map v3 format][]:
+`payload` is an object with keys matching the [Source map format][]:
 
-* `file`: {string}
-* `version`: {number}
-* `sources`: {string\[]}
-* `sourcesContent`: {string\[]}
-* `names`: {string\[]}
-* `mappings`: {string}
-* `sourceRoot`: {string}
+* `file` {string}
+* `version` {number}
+* `sources` {string\[]}
+* `sourcesContent` {string\[]}
+* `names` {string\[]}
+* `mappings` {string}
+* `sourceRoot` {string}
 
 `lineLengths` is an optional array of the length of each line in the
 generated code.
@@ -1709,17 +1722,17 @@ original file if found, or an empty object if not.
 
 The object returned contains the following keys:
 
-* generatedLine: {number} The line offset of the start of the
+* `generatedLine` {number} The line offset of the start of the
   range in the generated source
-* generatedColumn: {number} The column offset of start of the
+* `generatedColumn` {number} The column offset of start of the
   range in the generated source
-* originalSource: {string} The file name of the original source,
+* `originalSource` {string} The file name of the original source,
   as reported in the SourceMap
-* originalLine: {number} The line offset of the start of the
+* `originalLine` {number} The line offset of the start of the
   range in the original source
-* originalColumn: {number} The column offset of start of the
+* `originalColumn` {number} The column offset of start of the
   range in the original source
-* name: {string}
+* `name` {string}
 
 The returned value represents the raw range as it appears in the
 SourceMap, based on zero-indexed offsets, _not_ 1-indexed line and
@@ -1753,13 +1766,13 @@ If the `lineNumber` and `columnNumber` provided are not found in any
 source map, then an empty object is returned. Otherwise, the
 returned object contains the following keys:
 
-* name: {string | undefined} The name of the range in the
+* `name` {string|undefined} The name of the range in the
   source map, if one was provided
-* fileName: {string} The file name of the original source, as
+* `fileName` {string} The file name of the original source, as
   reported in the SourceMap
-* lineNumber: {number} The 1-indexed lineNumber of the
+* `lineNumber` {number} The 1-indexed lineNumber of the
   corresponding call site in the original source
-* columnNumber: {number} The 1-indexed columnNumber of the
+* `columnNumber` {number} The 1-indexed columnNumber of the
   corresponding call site in the original source
 
 [CommonJS]: modules.md
@@ -1767,8 +1780,8 @@ returned object contains the following keys:
 [Customization hooks]: #customization-hooks
 [ES Modules]: esm.md
 [Permission Model]: permissions.md#permission-model
-[Source Map]: https://sourcemaps.info/spec.html
-[Source map v3 format]: https://sourcemaps.info/spec.html#h.mofvlxcwqzej
+[Source Map]: https://tc39.es/ecma426/
+[Source map format]: https://tc39.es/ecma426/#sec-source-map-format
 [V8 JavaScript code coverage]: https://v8project.blogspot.com/2017/12/javascript-code-coverage.html
 [V8 code cache]: https://v8.dev/blog/code-caching-for-devs
 [`"exports"`]: packages.md#exports
@@ -1784,6 +1797,7 @@ returned object contains the following keys:
 [`module.enableCompileCache()`]: #moduleenablecompilecachecachedir
 [`module.flushCompileCache()`]: #moduleflushcompilecache
 [`module.getCompileCacheDir()`]: #modulegetcompilecachedir
+[`module.setSourceMapsSupport()`]: #modulesetsourcemapssupportenabled-options
 [`module`]: #the-module-object
 [`os.tmpdir()`]: os.md#ostmpdir
 [`registerHooks`]: #moduleregisterhooksoptions
@@ -1796,7 +1810,7 @@ returned object contains the following keys:
 [module wrapper]: modules.md#the-module-wrapper
 [realm]: https://tc39.es/ecma262/#realm
 [resolve hook]: #resolvespecifier-context-nextresolve
-[source map include directives]: https://sourcemaps.info/spec.html#h.lmz475t4mvbx
+[source map include directives]: https://tc39.es/ecma426/#sec-linking-generated-code
 [the documentation of `Worker`]: worker_threads.md#new-workerfilename-options
 [transferable objects]: worker_threads.md#portpostmessagevalue-transferlist
 [transform TypeScript features]: typescript.md#typescript-features

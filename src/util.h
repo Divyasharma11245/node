@@ -25,6 +25,7 @@
 #if defined(NODE_WANT_INTERNALS) && NODE_WANT_INTERNALS
 
 #include "uv.h"
+#include "v8-inspector.h"
 #include "v8.h"
 
 #include "node.h"
@@ -315,7 +316,7 @@ class KVStore {
                         v8::Local<v8::String> key) const = 0;
   virtual int32_t Query(const char* key) const = 0;
   virtual void Delete(v8::Isolate* isolate, v8::Local<v8::String> key) = 0;
-  virtual v8::Local<v8::Array> Enumerate(v8::Isolate* isolate) const = 0;
+  virtual v8::MaybeLocal<v8::Array> Enumerate(v8::Isolate* isolate) const = 0;
 
   virtual std::shared_ptr<KVStore> Clone(v8::Isolate* isolate) const;
   virtual v8::Maybe<void> AssignFromObject(v8::Local<v8::Context> context,
@@ -655,38 +656,6 @@ struct MallocedBuffer {
   MallocedBuffer& operator=(const MallocedBuffer&) = delete;
 };
 
-template <typename T>
-class NonCopyableMaybe {
- public:
-  NonCopyableMaybe() : empty_(true) {}
-  explicit NonCopyableMaybe(T&& value)
-      : empty_(false),
-        value_(std::move(value)) {}
-
-  bool IsEmpty() const {
-    return empty_;
-  }
-
-  const T* get() const {
-    return empty_ ? nullptr : &value_;
-  }
-
-  const T* operator->() const {
-    CHECK(!empty_);
-    return &value_;
-  }
-
-  T&& Release() {
-    CHECK_EQ(empty_, false);
-    empty_ = true;
-    return std::move(value_);
-  }
-
- private:
-  bool empty_;
-  T value_;
-};
-
 // Test whether some value can be called with ().
 template <typename T, typename = void>
 struct is_callable : std::is_function<T> { };
@@ -719,6 +688,9 @@ inline v8::Maybe<void> FromV8Array(v8::Local<v8::Context> context,
 inline v8::MaybeLocal<v8::Value> ToV8Value(v8::Local<v8::Context> context,
                                            std::string_view str,
                                            v8::Isolate* isolate = nullptr);
+inline v8::MaybeLocal<v8::Value> ToV8Value(v8::Local<v8::Context> context,
+                                           v8_inspector::StringView str,
+                                           v8::Isolate* isolate);
 template <typename T, typename test_for_number =
     typename std::enable_if<std::numeric_limits<T>::is_specialized, bool>::type>
 inline v8::MaybeLocal<v8::Value> ToV8Value(v8::Local<v8::Context> context,
@@ -850,7 +822,11 @@ class PersistentToLocal {
 // computations.
 class FastStringKey {
  public:
-  constexpr explicit FastStringKey(std::string_view name);
+  // consteval ensures that the argument is a compile-time constant.
+  consteval explicit FastStringKey(std::string_view name);
+  // passing something that is not a compile-time constant needs explicit
+  // opt-in via this helper, as it defeats the purpose of FastStringKey.
+  static constexpr FastStringKey AllowDynamic(std::string_view name);
 
   struct Hash {
     constexpr size_t operator()(const FastStringKey& key) const;
@@ -860,6 +836,8 @@ class FastStringKey {
   constexpr std::string_view as_string_view() const;
 
  private:
+  constexpr explicit FastStringKey(std::string_view name, int dummy);
+
   static constexpr size_t HashImpl(std::string_view str);
 
   const std::string_view name_;
@@ -954,6 +932,16 @@ void SetMethodNoSideEffect(v8::Isolate* isolate,
                            const std::string_view name,
                            v8::FunctionCallback callback);
 
+// Set the Symbol.dispose method on the prototype of the class.
+void SetProtoDispose(v8::Isolate* isolate,
+                     v8::Local<v8::FunctionTemplate> that,
+                     v8::FunctionCallback callback);
+
+// Set the Symbol.asyncDispose method on the prototype of the class.
+void SetProtoAsyncDispose(v8::Isolate* isolate,
+                          v8::Local<v8::FunctionTemplate> that,
+                          v8::FunctionCallback callback);
+
 enum class SetConstructorFunctionFlag {
   NONE,
   SET_CLASS_NAME,
@@ -1022,9 +1010,12 @@ v8::Maybe<int> GetValidFileMode(Environment* env,
                                 v8::Local<v8::Value> input,
                                 uv_fs_type type);
 
+#ifdef _WIN32
 // Returns true if OS==Windows and filename ends in .bat or .cmd,
 // case insensitive.
 inline bool IsWindowsBatchFile(const char* filename);
+inline std::wstring ConvertToWideString(const std::string& str, UINT code_page);
+#endif  // _WIN32
 
 }  // namespace node
 

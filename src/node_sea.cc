@@ -36,10 +36,12 @@ using v8::FunctionCallbackInfo;
 using v8::HandleScope;
 using v8::Isolate;
 using v8::Local;
+using v8::LocalVector;
 using v8::MaybeLocal;
 using v8::NewStringType;
 using v8::Object;
 using v8::ScriptCompiler;
+using v8::ScriptOrigin;
 using v8::String;
 using v8::Value;
 
@@ -398,10 +400,9 @@ ExitCode GenerateSnapshotForSEA(const SeaConfig& config,
     return exit_code;
   }
   auto& persistents = snapshot.env_info.principal_realm.persistent_values;
-  auto it = std::find_if(
-      persistents.begin(), persistents.end(), [](const PropInfo& prop) {
-        return prop.name == "snapshot_deserialize_main";
-      });
+  auto it = std::ranges::find_if(persistents, [](const PropInfo& prop) {
+    return prop.name == "snapshot_deserialize_main";
+  });
   if (it == persistents.end()) {
     FPrintF(
         stderr,
@@ -450,23 +451,32 @@ std::optional<std::string> GenerateCodeCache(std::string_view main_path,
     return std::nullopt;
   }
 
-  std::vector<Local<String>> parameters = {
-      FIXED_ONE_BYTE_STRING(isolate, "exports"),
-      FIXED_ONE_BYTE_STRING(isolate, "require"),
-      FIXED_ONE_BYTE_STRING(isolate, "module"),
-      FIXED_ONE_BYTE_STRING(isolate, "__filename"),
-      FIXED_ONE_BYTE_STRING(isolate, "__dirname"),
-  };
+  LocalVector<String> parameters(
+      isolate,
+      {
+          FIXED_ONE_BYTE_STRING(isolate, "exports"),
+          FIXED_ONE_BYTE_STRING(isolate, "require"),
+          FIXED_ONE_BYTE_STRING(isolate, "module"),
+          FIXED_ONE_BYTE_STRING(isolate, "__filename"),
+          FIXED_ONE_BYTE_STRING(isolate, "__dirname"),
+      });
+  ScriptOrigin script_origin(filename, 0, 0, true);
+  ScriptCompiler::Source script_source(content, script_origin);
+  MaybeLocal<Function> maybe_fn =
+      ScriptCompiler::CompileFunction(context,
+                                      &script_source,
+                                      parameters.size(),
+                                      parameters.data(),
+                                      0,
+                                      nullptr);
+  Local<Function> fn;
+  if (!maybe_fn.ToLocal(&fn)) {
+    return std::nullopt;
+  }
 
   // TODO(RaisinTen): Using the V8 code cache prevents us from using `import()`
   // in the SEA code. Support it.
   // Refs: https://github.com/nodejs/node/pull/48191#discussion_r1213271430
-  Local<Function> fn;
-  if (!contextify::CompileFunction(context, filename, content, &parameters)
-           .ToLocal(&fn)) {
-    return std::nullopt;
-  }
-
   std::unique_ptr<ScriptCompiler::CachedData> cache{
       ScriptCompiler::CreateCodeCacheForFunction(fn)};
   std::string code_cache(cache->data, cache->data + cache->length);
@@ -637,8 +647,9 @@ bool MaybeLoadSingleExecutableApplication(Environment* env) {
 
   LoadEnvironment(env, LoadSingleExecutableApplication);
   return true;
-#endif
+#else
   return false;
+#endif
 }
 
 void Initialize(Local<Object> target,

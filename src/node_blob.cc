@@ -21,6 +21,7 @@ using v8::Array;
 using v8::ArrayBuffer;
 using v8::ArrayBufferView;
 using v8::BackingStore;
+using v8::BackingStoreInitializationMode;
 using v8::Context;
 using v8::Function;
 using v8::FunctionCallbackInfo;
@@ -82,8 +83,8 @@ void Concat(const FunctionCallbackInfo<Value>& args) {
     }
   }
 
-  std::shared_ptr<BackingStore> store =
-      ArrayBuffer::NewBackingStore(env->isolate(), total);
+  std::shared_ptr<BackingStore> store = ArrayBuffer::NewBackingStore(
+      env->isolate(), total, BackingStoreInitializationMode::kUninitialized);
   uint8_t* ptr = static_cast<uint8_t*>(store->Data());
   for (size_t n = 0; n < views.size(); n++) {
     uint8_t* from =
@@ -168,11 +169,10 @@ BaseObjectPtr<Blob> Blob::Create(Environment* env,
 
   Local<Function> ctor;
   if (!GetConstructorTemplate(env)->GetFunction(env->context()).ToLocal(&ctor))
-    return BaseObjectPtr<Blob>();
+    return nullptr;
 
   Local<Object> obj;
-  if (!ctor->NewInstance(env->context()).ToLocal(&obj))
-    return BaseObjectPtr<Blob>();
+  if (!ctor->NewInstance(env->context()).ToLocal(&obj)) return nullptr;
 
   return MakeBaseObject<Blob>(env, obj, data_queue);
 }
@@ -211,8 +211,8 @@ void Blob::New(const FunctionCallbackInfo<Value>& args) {
       }
 
       // If the ArrayBuffer is not detachable, we will copy from it instead.
-      std::shared_ptr<BackingStore> store =
-          ArrayBuffer::NewBackingStore(isolate, byte_length);
+      std::shared_ptr<BackingStore> store = ArrayBuffer::NewBackingStore(
+          isolate, byte_length, BackingStoreInitializationMode::kUninitialized);
       uint8_t* ptr = static_cast<uint8_t*>(buf->Data()) + byte_offset;
       std::copy(ptr, ptr + byte_length, static_cast<uint8_t*>(store->Data()));
       return DataQueue::CreateInMemoryEntryFromBackingStore(
@@ -326,7 +326,7 @@ BaseObjectPtr<Blob::Reader> Blob::Reader::Create(Environment* env,
            ->InstanceTemplate()
            ->NewInstance(env->context())
            .ToLocal(&obj)) {
-    return BaseObjectPtr<Blob::Reader>();
+    return nullptr;
   }
 
   return MakeBaseObject<Blob::Reader>(env, obj, std::move(blob));
@@ -376,8 +376,10 @@ void Blob::Reader::Pull(const FunctionCallbackInfo<Value>& args) {
       size_t total = 0;
       for (size_t n = 0; n < count; n++) total += vecs[n].len;
 
-      std::shared_ptr<BackingStore> store =
-          ArrayBuffer::NewBackingStore(env->isolate(), total);
+      std::shared_ptr<BackingStore> store = ArrayBuffer::NewBackingStore(
+          env->isolate(),
+          total,
+          BackingStoreInitializationMode::kUninitialized);
       auto ptr = static_cast<uint8_t*>(store->Data());
       for (size_t n = 0; n < count; n++) {
         std::copy(vecs[n].base, vecs[n].base + vecs[n].len, ptr);
@@ -448,7 +450,8 @@ void Blob::StoreDataObject(const FunctionCallbackInfo<Value>& args) {
         std::string(*type, type.length())));
 }
 
-// TODO(@anonrig): Add V8 Fast API to the following function
+// Note: applying the V8 Fast API to the following function does not produce
+//       performance benefits (ref: https://github.com/nodejs/node/pull/58544)
 void Blob::RevokeObjectURL(const FunctionCallbackInfo<Value>& args) {
   CHECK_GE(args.Length(), 1);
   CHECK(args[0]->IsString());

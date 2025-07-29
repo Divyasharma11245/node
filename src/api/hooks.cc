@@ -26,10 +26,6 @@ void AtExit(Environment* env, void (*cb)(void* arg), void* arg) {
   env->AtExit(cb, arg);
 }
 
-void EmitBeforeExit(Environment* env) {
-  USE(EmitProcessBeforeExit(env));
-}
-
 Maybe<bool> EmitProcessBeforeExit(Environment* env) {
   TRACE_EVENT0(TRACING_CATEGORY_NODE1(environment), "BeforeExit");
   if (!env->destroy_async_id_list()->empty())
@@ -48,14 +44,6 @@ Maybe<bool> EmitProcessBeforeExit(Environment* env) {
 
   return ProcessEmit(env, "beforeExit", exit_code).IsEmpty() ? Nothing<bool>()
                                                              : Just(true);
-}
-
-static ExitCode EmitExitInternal(Environment* env) {
-  return EmitProcessExitInternal(env).FromMaybe(ExitCode::kGenericUserError);
-}
-
-int EmitExit(Environment* env) {
-  return static_cast<int>(EmitExitInternal(env));
 }
 
 Maybe<ExitCode> EmitProcessExitInternal(Environment* env) {
@@ -192,6 +180,12 @@ void RequestInterrupt(Environment* env, void (*fun)(void* arg), void* arg) {
 
 async_id AsyncHooksGetExecutionAsyncId(Isolate* isolate) {
   Environment* env = Environment::GetCurrent(isolate);
+  if (env == nullptr) return -1;
+  return env->execution_async_id();
+}
+
+async_id AsyncHooksGetExecutionAsyncId(Local<Context> context) {
+  Environment* env = Environment::GetCurrent(context);
   if (env == nullptr) return -1;
   return env->execution_async_id();
 }

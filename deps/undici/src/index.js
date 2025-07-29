@@ -8,6 +8,7 @@ const Agent = require('./lib/dispatcher/agent')
 const ProxyAgent = require('./lib/dispatcher/proxy-agent')
 const EnvHttpProxyAgent = require('./lib/dispatcher/env-http-proxy-agent')
 const RetryAgent = require('./lib/dispatcher/retry-agent')
+const H2CClient = require('./lib/dispatcher/h2c-client')
 const errors = require('./lib/core/errors')
 const util = require('./lib/core/util')
 const { InvalidArgumentError } = errors
@@ -33,6 +34,7 @@ module.exports.Agent = Agent
 module.exports.ProxyAgent = ProxyAgent
 module.exports.EnvHttpProxyAgent = EnvHttpProxyAgent
 module.exports.RetryAgent = RetryAgent
+module.exports.H2CClient = H2CClient
 module.exports.RetryHandler = RetryHandler
 
 module.exports.DecoratorHandler = DecoratorHandler
@@ -155,10 +157,12 @@ module.exports.parseMIMEType = parseMIMEType
 module.exports.serializeAMimeType = serializeAMimeType
 
 const { CloseEvent, ErrorEvent, MessageEvent } = require('./lib/web/websocket/events')
-module.exports.WebSocket = require('./lib/web/websocket/websocket').WebSocket
+const { WebSocket, ping } = require('./lib/web/websocket/websocket')
+module.exports.WebSocket = WebSocket
 module.exports.CloseEvent = CloseEvent
 module.exports.ErrorEvent = ErrorEvent
 module.exports.MessageEvent = MessageEvent
+module.exports.ping = ping
 
 module.exports.WebSocketStream = require('./lib/web/websocket/stream/websocketstream').WebSocketStream
 module.exports.WebSocketError = require('./lib/web/websocket/stream/websocketerror').WebSocketError
@@ -179,3 +183,18 @@ module.exports.mockErrors = mockErrors
 const { EventSource } = require('./lib/web/eventsource/eventsource')
 
 module.exports.EventSource = EventSource
+
+function install () {
+  globalThis.fetch = module.exports.fetch
+  globalThis.Headers = module.exports.Headers
+  globalThis.Response = module.exports.Response
+  globalThis.Request = module.exports.Request
+  globalThis.FormData = module.exports.FormData
+  globalThis.WebSocket = module.exports.WebSocket
+  globalThis.CloseEvent = module.exports.CloseEvent
+  globalThis.ErrorEvent = module.exports.ErrorEvent
+  globalThis.MessageEvent = module.exports.MessageEvent
+  globalThis.EventSource = module.exports.EventSource
+}
+
+module.exports.install = install

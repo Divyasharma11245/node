@@ -51,6 +51,7 @@ namespace node {
   V(HTTP2SETTINGS)                                                             \
   V(HTTPINCOMINGMESSAGE)                                                       \
   V(HTTPCLIENTREQUEST)                                                         \
+  V(LOCKS)                                                                     \
   V(JSSTREAM)                                                                  \
   V(JSUDPWRAP)                                                                 \
   V(MESSAGEPORT)                                                               \
@@ -78,7 +79,9 @@ namespace node {
   V(UDPWRAP)                                                                   \
   V(SIGINTWATCHDOG)                                                            \
   V(WORKER)                                                                    \
+  V(WORKERCPUUSAGE)                                                            \
   V(WORKERHEAPSNAPSHOT)                                                        \
+  V(WORKERHEAPSTATISTICS)                                                      \
   V(WRITEWRAP)                                                                 \
   V(ZLIB)
 

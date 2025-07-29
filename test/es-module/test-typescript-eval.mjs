@@ -11,7 +11,7 @@ test('eval TypeScript ESM syntax', async () => {
     const text: string = 'Hello, TypeScript!'
     console.log(util.styleText('red', text));`]);
 
-  match(result.stderr, /Type Stripping is an experimental feature and might change at any time/);
+  strictEqual(result.stderr, '');
   match(result.stdout, /Hello, TypeScript!/);
   strictEqual(result.code, 0);
 });
@@ -24,7 +24,7 @@ test('eval TypeScript ESM syntax with input-type module', async () => {
     const text: string = 'Hello, TypeScript!'
     console.log(util.styleText('red', text));`]);
 
-  match(result.stderr, /Type Stripping is an experimental feature and might change at any time/);
+  strictEqual(result.stderr, '');
   match(result.stdout, /Hello, TypeScript!/);
   strictEqual(result.code, 0);
 });
@@ -36,7 +36,7 @@ test('eval TypeScript CommonJS syntax', async () => {
     const text: string = 'Hello, TypeScript!'
     console.log(util.styleText('red', text));`]);
   match(result.stdout, /Hello, TypeScript!/);
-  match(result.stderr, /ExperimentalWarning: Type Stripping is an experimental/);
+  strictEqual(result.stderr, '');
   strictEqual(result.code, 0);
 });
 
@@ -72,7 +72,7 @@ test('TypeScript ESM syntax not specified', async () => {
     `import util from 'node:util'
     const text: string = 'Hello, TypeScript!'
     console.log(text);`]);
-  match(result.stderr, /ExperimentalWarning: Type Stripping is an experimental/);
+  strictEqual(result.stderr, '');
   match(result.stdout, /Hello, TypeScript!/);
   strictEqual(result.code, 0);
 });
@@ -162,7 +162,7 @@ test('check warning is emitted when eval TypeScript CommonJS syntax', async () =
     `const util = require('node:util');
     const text: string = 'Hello, TypeScript!'
     console.log(util.styleText('red', text));`]);
-  match(result.stderr, /ExperimentalWarning: Type Stripping is an experimental/);
+  strictEqual(result.stderr, '');
   match(result.stdout, /Hello, TypeScript!/);
   strictEqual(result.code, 0);
 });
@@ -260,5 +260,23 @@ test('should not allow declare module keyword', async () => {
     'declare module F { export type x = number }']);
   strictEqual(result.stdout, '');
   match(result.stderr, /ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX/);
+  strictEqual(result.code, 1);
+});
+
+// TODO (marco-ippolito) Remove the extra padding from the error message
+// The padding comes from swc it will be removed in a future amaro release
+test('the error message should not contain extra padding', async () => {
+  const result = await spawnPromisified(process.execPath, [
+    '--input-type=module-typescript',
+    '--eval',
+    'declare module F { export type x = number }']);
+  strictEqual(result.stdout, '');
+  // Windows uses \r\n as line endings
+  const lines = result.stderr.replace(/\r\n/g, '\n').split('\n');
+  strictEqual(lines[0], '[eval]:1');
+  strictEqual(lines[1], 'declare module F { export type x = number }');
+  strictEqual(lines[2], '        ^^^^^^^^');
+  strictEqual(lines[4], 'SyntaxError [ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX]:' +
+    ' `module` keyword is not supported. Use `namespace` instead.');
   strictEqual(result.code, 1);
 });
